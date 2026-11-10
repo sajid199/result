@@ -41,16 +41,10 @@ th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--bd);white-s
 <body>
 <div class="wrap">
 <h1>FMGE Result Analyzer</h1>
-<p class="sub">Upload the result PDF (or CSV/TXT), or paste rows. Everything runs in your browser.</p>
+<p class="sub">Analyzing the bundled FMGE October 2026 result PDF. Everything runs in your browser.</p>
 
 <div class="card">
-<h2>1. Load data</h2>
-<div class="row">
-<input type="file" id="file" accept=".pdf,.csv,.txt">
-<button class="alt" id="sample">Load sample</button>
-</div>
-<textarea id="paste" placeholder="Or paste text like: 1 FMGE26201349 2611200001 105 FAIL"></textarea>
-<div class="row" style="margin-top:10px"><button id="go">Analyze pasted text</button></div>
+<h2>FMGE October 2026 results</h2>
 <div class="bar" id="bar"><i id="bi"></i></div>
 <div id="msg"></div>
 </div>
@@ -78,7 +72,7 @@ th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--bd);white-s
 <script>
 var rows=[],charts={};
 var $=function(i){return document.getElementById(i)};
-var SAMPLE="1 FMGE26201349 2611200001 105 FAIL 2 FMGE26232086 2611200002 162 PASS 3 FMGE26212439 2611200003 133 FAIL 4 FMGE26217962 2611200004 99 FAIL 5 FMGE26237240 2611200005 100 FAIL 6 FMGE26239934 2611200006 114 FAIL";
+var DATA_URL='data/FMGE_OCTOBER2026_DS.pdf';
 
 function parse(t){
   var re=/(FMGE\d+)[\s,;|]+(\d{6,})[\s,;|]+(-?\d+(?:\.\d+)?)[\s,;|]+(PASS|FAIL)/gi,m,seen={},out=[];
@@ -90,10 +84,9 @@ function parse(t){
 }
 function msg(s){$('msg').textContent=s}
 
-async function readPdf(f){
+async function readPdf(url){
   pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-  var buf=await f.arrayBuffer();
-  var pdf=await pdfjsLib.getDocument({data:buf}).promise,all=[];
+  var pdf=await pdfjsLib.getDocument({url:url}).promise,all=[];
   $('bar').style.display='block';
   for(var i=1;i<=pdf.numPages;i++){
     var pg=await pdf.getPage(i),tc=await pg.getTextContent();
@@ -102,13 +95,14 @@ async function readPdf(f){
   }
   return all.join('\n');
 }
-async function load(f){
+async function loadBundledData(){
   try{
-    var t;
-    if(/\.pdf$/i.test(f.name)){msg('Opening PDF...');t=await readPdf(f)}
-    else t=await f.text();
-    run(t);
-  }catch(e){msg('Could not read the file ('+e.message+'). Try exporting the PDF text to .txt and uploading that, or paste rows below.')}
+    msg('Loading bundled results...');
+    run(await readPdf(DATA_URL));
+  }catch(e){
+    var hint=location.protocol==='file:'?' Open this folder through a local web server so the bundled PDF can be read.':'';
+    msg('Could not load the bundled results ('+e.message+').'+hint);
+  }
 }
 function run(t){
   rows=parse(t);
@@ -156,14 +150,12 @@ function table(){
   $('tb').innerHTML=a.slice(0,100).map(function(r,i){return '<tr><td>'+(i+1)+'</td><td>'+r.app+'</td><td>'+r.roll+'</td><td>'+r.score+'</td><td class="'+(r.res==='PASS'?'p':'f')+'">'+r.res+'</td></tr>'}).join('');
   $('cnt').textContent='Showing '+Math.min(100,a.length)+' of '+a.length.toLocaleString()+' matching rows';
 }
-$('file').onchange=function(e){if(e.target.files[0])load(e.target.files[0])};
-$('go').onclick=function(){run($('paste').value)};
-$('sample').onclick=function(){$('paste').value=SAMPLE;run(SAMPLE)};
 ['q','fl','so'].forEach(function(i){$(i).oninput=function(){if(rows.length)table()}});
 $('dl').onclick=function(){
   var c='Application,Roll,Score,Result\n'+view().map(function(r){return [r.app,r.roll,r.score,r.res].join(',')}).join('\n');
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));a.download='fmge-results.csv';a.click();
 };
+window.addEventListener('load',loadBundledData);
 </script>
 </body>
 </html>
